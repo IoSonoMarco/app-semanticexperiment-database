@@ -115,7 +115,10 @@ class ImagePairsPlane {
         this.setIntersectionPoints()
         this.setAmchorAngleBoundaries()
         this.sampleImagePairedRelativePosition()
+    }
 
+    populateStimuli() {
+        // Set new Stimuli
         const pos = Math.floor(Math.random() * (N_IMAGES + 1))
         const imageData = imageFiles[pos]
     
@@ -145,6 +148,7 @@ class ImagePairsPlane {
     removeStimuli() {
         img1.style.visibility = "hidden"
         img2.style.visibility = "hidden"
+        this.populateStimuli()
     }
 
     drawStimuliForDebugging(verbose=false) {
@@ -227,8 +231,8 @@ class Trial {
         }),
         // 
         this.endTrialSentence = document.querySelector(".end-trial-sentence"),
-        this.init()
-        this.imagePairsPlane.createStimuli()
+        this.init(),
+        this.imagePairsPlane.populateStimuli()
     }
 
     init() {
@@ -242,14 +246,14 @@ class Trial {
         this.slider.disabled = false
         this.sliderFill.disabled = false
     }
-
+        
     play() {
         console.log("trial running")
+        this.imagePairsPlane.createStimuli()
         this.imagePairsPlane.drawStimuli()
         
         setTimeout(() => {
             this.imagePairsPlane.removeStimuli()
-            this.imagePairsPlane.createStimuli()
             this.playerBox.style.visibility = "visible"
             trialStartTime = new Date()
         }, this.stimuliDuration)
