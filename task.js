@@ -226,8 +226,9 @@ class Trial {
             this.idle()
         }),
         // 
-        this.endTrialSentence = document.querySelector(".end-trial-sentence")
+        this.endTrialSentence = document.querySelector(".end-trial-sentence"),
         this.init()
+        this.imagePairsPlane.createStimuli()
     }
 
     init() {
@@ -240,8 +241,6 @@ class Trial {
         this.sliderFill.classList.remove("slider-fill-mouse-up")
         this.slider.disabled = false
         this.sliderFill.disabled = false
-
-        this.imagePairsPlane.createStimuli()
     }
 
     play() {
@@ -250,6 +249,7 @@ class Trial {
         
         setTimeout(() => {
             this.imagePairsPlane.removeStimuli()
+            this.imagePairsPlane.createStimuli()
             this.playerBox.style.visibility = "visible"
             trialStartTime = new Date()
         }, this.stimuliDuration)
