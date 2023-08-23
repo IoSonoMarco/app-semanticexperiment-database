@@ -15,8 +15,8 @@ const N_IMAGES = imageFiles.length
 const N_TRIALS = 5
 
 // VARIABLES
-let trialStartTime = null
-let trialEndTime = null
+let trialStartTime
+let trialEndTime
 
 let responseTimes = []
 let playerScore = []
@@ -295,7 +295,7 @@ class Block {
 const rho = 500
 const plane = new ImagePairsPlane(rho)
 
-const trial = new Trial(plane, 1000, 500)
+const trial = new Trial(plane, 1000, 2000)
 
 //plane.createStimuli()
 //plane.drawStimuliForDebugging(true)
