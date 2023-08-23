@@ -97,5 +97,17 @@ img {
     visibility: hidden;
 }
 
+.end-trial-box {
+    margin: auto;
+    margin-top: -10px;
+    text-align: center;
+}
+
+.end-trial-sentence {
+    color: rgb(0, 149, 175);
+    font-size: 20px;
+    visibility: hidden;
+}
+
 
 

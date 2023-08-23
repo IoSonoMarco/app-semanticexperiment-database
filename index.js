@@ -1,12 +1,8 @@
+// ELEMENTS
 const container = document.querySelector(".container")
 const rectContainer = container.getBoundingClientRect()
 
-const player = document.querySelector("#player")
-
-const slider = document.querySelector(".slider")
-const sliderFill = document.querySelector(".slider-fill")
-
-// VARIABLES
+// STIMULI
 const img1 = document.querySelector("#img-1")
 const img2 = document.querySelector("#img-2")
 
@@ -14,16 +10,18 @@ const img2 = document.querySelector("#img-2")
 const RADIUS = rectContainer.height/2
 const IMAGE_RADIUS = img1.getBoundingClientRect().width/2
 const OFFSET_FROM_CENTER = RADIUS/2
+const N_IMAGES = imageFiles.length
+
+const N_TRIALS = 5
+
+// VARIABLES
+let trialStartTime = null
+let trialEndTime = null
+
+let responseTimes = []
+let playerScore = []
 
 // EVENT LISTENERS
-player.oninput = () => sliderFill.style.width = player.value + "%"
-player.addEventListener("mouseup", () => {
-    console.log(player.value)
-    slider.classList.add("slider-mouse-up")
-    sliderFill.classList.add("slider-fill-mouse-up")
-    slider.disabled = true
-    sliderFill.disabled = true
-})
 
 // CLASSES
 class ImagePairsPlane {
@@ -119,6 +117,34 @@ class ImagePairsPlane {
         this.sampleImagePairedRelativePosition()
     }
 
+    drawStimuli() {
+        const pos = Math.floor(Math.random() * (N_IMAGES + 1))
+        const imageData = imageFiles[pos]
+
+        const anchorImage = imageData.anchor
+        const pairedImage = imageData.pair
+        const score = imageData.score
+
+        // Draw the Anchor Stimulus
+        const anchorImageAbsoluteCoord = this.relativeToAbsoluteCoord(this.anchorImagePosition)
+        img1.src = anchorImage
+        img1.style.left = anchorImageAbsoluteCoord.x + "px"
+        img1.style.bottom = anchorImageAbsoluteCoord.y + "px"
+        img1.style.visibility = "visible"
+
+        // Draw the Paired Stimulus
+        const pairedImageAbsoluteCoord = this.relativeToAbsoluteCoord(this.pairedImagePosition)
+        img2.src = pairedImage
+        img2.style.left = pairedImageAbsoluteCoord.x + "px"
+        img2.style.bottom = pairedImageAbsoluteCoord.y + "px"
+        img2.style.visibility = "visible"
+    }
+
+    removeStimuli() {
+        img1.style.visibility = "hidden"
+        img2.style.visibility = "hidden"
+    }
+
     drawStimuliForDebugging(verbose=false) {
         // Draw Main Circle Plane Center
         const p = document.createElement("div")
@@ -176,130 +202,112 @@ class ImagePairsPlane {
     }
 }
 
+let awaitForScore
+
+class Trial {
+    constructor(imagePairsPlane, stimuliDuration, idleDuration) {
+        this.imagePairsPlane = imagePairsPlane,
+        this.stimuliDuration = stimuliDuration,
+        this.idleDuration = idleDuration,
+        //
+        this.playerBox = document.querySelector(".player-box"),
+        this.slider = document.querySelector(".slider"),
+        this.sliderFill = document.querySelector(".slider-fill"),
+        //
+        this.player = document.querySelector("#player"),
+        this.player.oninput = () => this.sliderFill.style.width = this.player.value + "%",
+        this.player.addEventListener("mouseup", () => {
+            this.slider.classList.add("slider-mouse-up")
+            this.sliderFill.classList.add("slider-fill-mouse-up")
+            this.slider.disabled = true
+            this.sliderFill.disabled = true
+            this.idle()
+        }),
+        // 
+        this.endTrialSentence = document.querySelector(".end-trial-sentence")
+        this.init()
+    }
+
+    init() {
+        awaitForScore = null
+        this.endTrialSentence.style.visibility = "hidden"
+        this.playerBox.style.visibility = "hidden"
+        this.player.value = 0
+        this.sliderFill.style.width = 0
+        this.slider.classList.remove("slider-mouse-up")
+        this.sliderFill.classList.remove("slider-fill-mouse-up")
+        this.slider.disabled = false
+        this.sliderFill.disabled = false
+    }
+
+    play() {
+        console.log("trial running")
+        this.imagePairsPlane.createStimuli()
+        this.imagePairsPlane.drawStimuli()
+        
+        setTimeout(() => {
+            this.imagePairsPlane.removeStimuli()
+            this.playerBox.style.visibility = "visible"
+            trialStartTime = new Date()
+        }, this.stimuliDuration)
+    }
+
+    idle() {
+        trialEndTime = new Date()
+        responseTimes.push(trialEndTime - trialStartTime)
+        playerScore.push(this.player.value)
+        console.log(responseTimes, playerScore)
+
+        this.endTrialSentence.style.visibility = "visible"
+
+        setTimeout(() => {
+            if (awaitForScore) awaitForScore()
+        }, this.idleDuration)
+    }
+}
+
+const awaitForResolve = () => {
+    return new Promise(resolve => awaitForScore = resolve)
+}
+
+class Block {
+    constructor(trialClass, nTrials, interTrialInterval) {
+        this.trialClass = trialClass,
+        this.nTrials = nTrials
+        this.interTrialInterval = interTrialInterval
+    }
+
+    async run() {
+
+        for (let i=0; i<this.nTrials; i++) {
+            this.trialClass.init()
+            this.trialClass.play()
+            await awaitForResolve()
+        }
+
+    }
+}
+
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+
 const rho = 500
 const plane = new ImagePairsPlane(rho)
 
-plane.createStimuli()
-plane.drawStimuliForDebugging(true)
+const trial = new Trial(plane, 1000, 500)
 
-/* // FUNCTIONS
-const sampleImagePosition = (angle_=null) => {
-    let angle
-    if (angle_) {
-        const lowerBound = 2*Math.PI-(angle_ + NON_SAMPLING_ANGLE)
-        const upperBound = angle_ - NON_SAMPLING_ANGLE
-        angle = Math.random() * upperBound - lowerBound 
-    } else {
-        angle = Math.random() * 2*Math.PI
-    }
-    const dist = Math.floor(Math.random() * (RADIUS - IMAGE_RADIUS/2 - OFFSET_FROM_CENTER + 1) + OFFSET_FROM_CENTER)
-    const coord = [dist * Math.cos(angle), dist * Math.sin(angle)]
-    const left = coord[0] + RELATIVE_CENTER[0]
-    const bottom = coord[1] + RELATIVE_CENTER[1]
-    return {left, bottom, angle, dist, coord}
-}
+//plane.createStimuli()
+//plane.drawStimuliForDebugging(true)
+//plane.drawStimuli()
 
-const getIntersectionPoints = (d, x, y) => {
-    const first_term = 1/2 * (1 + (RADIUS**2 - rho**2)/(d**2))
-    const second_term = 1/2 * Math.sqrt(2*(RADIUS**2 + rho**2)/(d**2) - ((RADIUS**2 - rho**2)**2)/(d**4) - 1)
-    const x1 = first_term*x + second_term*y
-    const x2 = first_term*x - second_term*y
-    const y1 = first_term*y - second_term*x
-    const y2 = first_term*y + second_term*x
-    return [[x1,y1], [x2,y2]]
-}
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
+/////////////////////////////////////////////////
 
-const getPivotAngleLowerUpperBounds = (coord1, coord2, xPivot, yPivot) => {
-    const x1 = coord1[0] - xPivot
-    const y1 = coord1[1] - yPivot
-    const x2 = coord2[0] - xPivot
-    const y2 = coord2[1] - yPivot
+const block = new Block(trial, N_TRIALS, 5000)
+block.run()
 
-    let lowerBound = Math.atan(y2/x2)
-    if ((y2 < 0) && (x2 > 0)) lowerBound += 2*Math.PI 
-    if (x2 < 0) lowerBound += Math.PI
-
-    let upperBound = Math.atan(y1/x1) 
-    if ((y1 < 0) && (x1 > 0)) upperBound += 2*Math.PI 
-    if (x1 < 0) upperBound += Math.PI
-
-    if (upperBound < lowerBound) upperBound += 2*Math.PI
-
-    lowerBound += 10 * Math.PI/180
-    upperBound -= 10 * Math.PI/180
-
-    console.log("coord 1", [x1,y1])
-    console.log("coord 2", [x2,y2])
-    console.log("angle bounds", [lowerBound, upperBound])
-
-    return {lowerBound, upperBound}
-}
-
-const sampleImagePairedPosition = (lb, ub, xPivot, yPivot) => {
-    const angle = Math.random() * (ub - lb) + lb
-    let left = rho * Math.cos(angle)
-    let bottom = rho * Math.sin(angle)
-
-    left += xPivot + RELATIVE_CENTER[0] 
-    bottom += yPivot + RELATIVE_CENTER[1]
-
-    return {left, bottom, angle}
-}
-
-
-
-//
-
-const {left, bottom, angle, dist, coord} = sampleImagePosition()
-
-const sq = document.createElement("div")
-sq.style.cssText = "width: 20px; height: 20px; position: absolute; transform: translateX(-50%) translateY(50%); background-color: green; border-radius: 100%;"
-sq.style.left = left + "px"
-sq.style.bottom = bottom + "px"
-container.appendChild(sq)
-const c = document.createElement("div")
-c.style.cssText = "border: 1px solid green; border-radius: 100%; position: absolute; translateX(-50%) translateY(50%);"
-c.style.left = left - rho + "px"
-c.style.bottom = bottom - rho + "px"
-c.style.width = rho*2 + "px"
-c.style.height = rho*2 + "px"
-container.appendChild(c)
-
-const coords = getIntersectionPoints(dist, left-RELATIVE_CENTER[0], bottom-RELATIVE_CENTER[1])
-console.log(coords)
-const {lowerBound, upperBound} = getPivotAngleLowerUpperBounds(coords[0], coords[1], left-RELATIVE_CENTER[0], bottom-RELATIVE_CENTER[1])
-const {left: left2, bottom: bottom2, angle: angle2} = sampleImagePairedPosition(lowerBound, upperBound, left-RELATIVE_CENTER[0], bottom-RELATIVE_CENTER[1])
-console.log("new image position", left2, bottom2, "angle", angle2)
-
-const sqNew = document.createElement("div")
-sqNew.style.cssText = "width: 20px; height: 20px; position: absolute; transform: translateX(-50%) translateY(50%); background-color: orange; border-radius: 100%; z-index: 20;"
-sqNew.style.left = left2 + "px"
-sqNew.style.bottom = bottom2 + "px"
-container.appendChild(sqNew)
-
-const coord1 = coords[0]
-const sq1 = document.createElement("div")
-sq1.style.cssText = "width: 20px; height: 20px; position: absolute; transform: translateX(-50%) translateY(50%); background-color: red; border-radius: 100%;"
-sq1.style.left = coord1[0] + RELATIVE_CENTER[0] + "px"
-sq1.style.bottom = coord1[1] + RELATIVE_CENTER[1] + "px"
-container.appendChild(sq1)
-
-const coord2 = coords[1]
-const sq2 = document.createElement("div")
-sq2.style.cssText = "width: 20px; height: 20px; position: absolute; transform: translateX(-50%) translateY(50%); background-color: red; border-radius: 100%"
-sq2.style.left = coord2[0] + RELATIVE_CENTER[0] + "px"
-sq2.style.bottom = coord2[1] + RELATIVE_CENTER[1] + "px"
-container.appendChild(sq2) */
-
-/* const {left: left1, bottom: bottom1, angle: angle1, coord: coord1} = sampleImagePosition()
-img1.style.left = left1 + "px"
-img1.style.bottom = bottom1 + "px"
-img1.style.visibility = "visible"
-
-const {left: left2, bottom: bottom2, angle: angle2, coord: coord2} = sampleImagePosition(angle1)
-img2.style.left = left2 + "px"
-img2.style.bottom = bottom2 + "px"
-img2.style.visibility = "visible" */
 
 
 
