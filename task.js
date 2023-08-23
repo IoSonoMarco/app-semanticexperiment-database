@@ -236,7 +236,6 @@ class Trial {
     }
 
     init() {
-        awaitForScore = null
         this.endTrialSentence.style.visibility = "hidden"
         this.playerBox.style.visibility = "hidden"
         this.player.value = 0
@@ -271,6 +270,11 @@ class Trial {
             if (awaitForScore) awaitForScore()
         }, this.idleDuration)
     }
+
+    end() {
+        this.endTrialSentence.textContent = "Great! You Completed the First Block!"
+        this.playerBox.style.visibility = "hidden"
+    }
 }
 
 const awaitForResolve = () => {
@@ -290,6 +294,10 @@ class Block {
             this.trialClass.init()
             this.trialClass.play()
             await awaitForResolve()
+            
+            if (i == this.nTrials-1) {
+                this.trialClass.end()
+            }
         }
 
     }
