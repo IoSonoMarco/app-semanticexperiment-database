@@ -238,11 +238,12 @@ class Trial {
         this.sliderFill.classList.remove("slider-fill-mouse-up")
         this.slider.disabled = false
         this.sliderFill.disabled = false
+
+        this.imagePairsPlane.createStimuli()
     }
 
     play() {
         console.log("trial running")
-        this.imagePairsPlane.createStimuli()
         this.imagePairsPlane.drawStimuli()
         
         setTimeout(() => {
