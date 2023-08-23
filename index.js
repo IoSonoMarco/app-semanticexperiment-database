@@ -115,28 +115,30 @@ class ImagePairsPlane {
         this.setIntersectionPoints()
         this.setAmchorAngleBoundaries()
         this.sampleImagePairedRelativePosition()
-    }
 
-    drawStimuli() {
         const pos = Math.floor(Math.random() * (N_IMAGES + 1))
         const imageData = imageFiles[pos]
-
+    
         const anchorImage = imageData.anchor
         const pairedImage = imageData.pair
         const score = imageData.score
 
-        // Draw the Anchor Stimulus
-        const anchorImageAbsoluteCoord = this.relativeToAbsoluteCoord(this.anchorImagePosition)
         img1.src = anchorImage
+        img2.src = pairedImage
+    }
+
+    drawStimuli() {
+        // Anchor Stimulus
+        const anchorImageAbsoluteCoord = this.relativeToAbsoluteCoord(this.anchorImagePosition)
         img1.style.left = anchorImageAbsoluteCoord.x + "px"
         img1.style.bottom = anchorImageAbsoluteCoord.y + "px"
-        img1.style.visibility = "visible"
 
-        // Draw the Paired Stimulus
+        // Paired Stimulus
         const pairedImageAbsoluteCoord = this.relativeToAbsoluteCoord(this.pairedImagePosition)
-        img2.src = pairedImage
         img2.style.left = pairedImageAbsoluteCoord.x + "px"
         img2.style.bottom = pairedImageAbsoluteCoord.y + "px"
+
+        img1.style.visibility = "visible"
         img2.style.visibility = "visible"
     }
 
