@@ -92,36 +92,6 @@
         </form>
     </div>
 
-    <script>
-        document.getElementById("infoForm").addEventListener("submit", function(event) {
-            event.preventDefault();
-
-            const name = document.getElementById("name").value;
-            const age = document.getElementById("age").value;
-            const gender = document.getElementById("gender").value;
-
-            const formData = {
-                name: name,
-                age: age,
-                gender: gender
-            };
-
-            fetch("https://psy-task-default-rtdb.europe-west1.firebasedatabase.app/data.json", {
-                method: "POST",
-                body: JSON.stringify(formData),
-                headers: {"Content-type": "application/json"}
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Data saved successfully:", data);
-                if (data) window.location.href = "task.html"
-                // You can perform any additional actions or display messages here
-            })
-            .catch(error => {
-                console.error("Error saving data:", error);
-                // Handle errors or display error messages here
-            });
-        });
-    </script>
+    <script src="index.js"></script>
 </body>
 </html>

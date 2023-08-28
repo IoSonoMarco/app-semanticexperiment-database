@@ -1,6 +1,20 @@
+const data = JSON.parse(localStorage.getItem("data"))
+data["userData"] = []
+localStorage.setItem("data", JSON.stringify(data))
+
 // ELEMENTS
+const metaContainer = document.querySelector(".meta-container")
+metaContainer.style.top = window.innerHeight/2 + "px"
+metaContainer.style.left = window.innerWidth/2 + "px"
+metaContainer.style.transform =  "translateY(-50%) translateX(-50%)"
+metaContainer.style.visibility = "visible"
+
 const container = document.querySelector(".container")
 const rectContainer = container.getBoundingClientRect()
+container.style.top = window.innerHeight/2 + "px"
+container.style.left = window.innerWidth/2 + "px"
+container.style.transform =  "translateY(-50%) translateX(-50%)"
+container.style.visibility = "visible"
 
 // STIMULI
 const img1 = document.querySelector("#img-1")
@@ -11,6 +25,7 @@ const RADIUS = rectContainer.height/2
 const IMAGE_RADIUS = img1.getBoundingClientRect().width/2
 const OFFSET_FROM_CENTER = RADIUS/2
 const N_IMAGES = imageFiles.length
+const TRIAL_MAX_TIME = 5000
 
 const N_TRIALS = 5
 
@@ -20,8 +35,23 @@ let trialEndTime
 
 let responseTimes = []
 let playerScore = []
+let stimuliSemanticScore = []
 
 // EVENT LISTENERS
+
+// FUNCTIONS
+const sendDataToFirebase =  async () => {
+    const data = JSON.parse(localStorage.getItem("data"))
+    return fetch("https://psy-task-default-rtdb.europe-west1.firebasedatabase.app/data.json", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: {"Content-type": "application/json"}
+    })
+    .then(response => response.json())
+    .then(data => {
+        return data
+    })
+}
 
 // CLASSES
 class ImagePairsPlane {
@@ -125,6 +155,7 @@ class ImagePairsPlane {
         const anchorImage = imageData.anchor
         const pairedImage = imageData.pair
         const score = imageData.score
+        stimuliSemanticScore.push(score)
 
         img1.src = anchorImage
         img2.src = pairedImage
@@ -208,7 +239,14 @@ class ImagePairsPlane {
     }
 }
 
+//
+
 let awaitForScore
+let awaitForTimeRunsOut
+
+let timeRunsOutTimer
+let countdown
+let countdownTime
 
 class Trial {
     constructor(imagePairsPlane, stimuliDuration, idleDuration) {
@@ -216,7 +254,7 @@ class Trial {
         this.stimuliDuration = stimuliDuration,
         this.idleDuration = idleDuration,
         //
-        this.playerBox = document.querySelector(".player-box"),
+        this.responseContainer = document.querySelector(".response-container"),
         this.slider = document.querySelector(".slider"),
         this.sliderFill = document.querySelector(".slider-fill"),
         //
@@ -233,11 +271,13 @@ class Trial {
         this.endTrialSentence = document.querySelector(".end-trial-sentence"),
         this.init(),
         this.imagePairsPlane.populateStimuli()
+        this.progressBar = document.querySelector("#countdown")
+        this.progressBar.max = TRIAL_MAX_TIME
     }
 
     init() {
         this.endTrialSentence.style.visibility = "hidden"
-        this.playerBox.style.visibility = "hidden"
+        this.responseContainer.style.visibility = "hidden"
         this.player.value = 0
         this.sliderFill.style.width = 0
         this.slider.classList.remove("slider-mouse-up")
@@ -247,22 +287,48 @@ class Trial {
     }
         
     play() {
-        console.log("trial running")
         this.imagePairsPlane.createStimuli()
         this.imagePairsPlane.drawStimuli()
         
         setTimeout(() => {
             this.imagePairsPlane.removeStimuli()
-            this.playerBox.style.visibility = "visible"
+            this.onResponsePhase()
+            this.responseContainer.style.visibility = "visible"
             trialStartTime = new Date()
         }, this.stimuliDuration)
     }
 
+    activateResponseCountdown() {
+        if (countdownTime <= 0) this.resetResponseCountdown()
+        this.progressBar.value = TRIAL_MAX_TIME
+        countdownTime = TRIAL_MAX_TIME
+        countdown = setInterval(() => {
+            if (countdownTime <= 0) this.resetResponseCountdown()
+            countdownTime -= 10
+            this.progressBar.value = countdownTime
+        }, 10)
+    }
+
+    resetResponseCountdown(keepProgressBarValue) {
+        if (countdown) clearInterval(countdown)
+        if (keepProgressBarValue) return
+        this.progressBar.value = 5000
+    }
+
+    onResponsePhase() {
+        timeRunsOutTimer = setTimeout(() => {
+            if (awaitForTimeRunsOut) awaitForTimeRunsOut()
+        }, TRIAL_MAX_TIME)
+        this.activateResponseCountdown()
+    }
+
     idle() {
+        this.resetResponseCountdown(true)
+        clearTimeout(timeRunsOutTimer)
+
         trialEndTime = new Date()
         responseTimes.push(trialEndTime - trialStartTime)
-        playerScore.push(this.player.value)
-        console.log(responseTimes, playerScore)
+        playerScore.push(this.player.value/100)
 
         this.endTrialSentence.style.visibility = "visible"
 
@@ -272,20 +338,31 @@ class Trial {
     }
 
     end() {
-        this.endTrialSentence.textContent = "Great! You Completed the First Block!"
-        this.playerBox.style.visibility = "hidden"
+        this.endTrialSentence.textContent = "Great! You Completed this Task Phase!"
+        this.responseContainer.style.visibility = "hidden"
+
+        const trialData = {
+            responeTimes: responseTimes,
+            distanceScores: playerScore,
+            semanticScores: stimuliSemanticScore.slice(0,-1)
+        }
+
+        return trialData
     }
 }
 
-const awaitForResolve = () => {
-    return new Promise(resolve => awaitForScore = resolve)
+const awaitForNextTrial = async () => {
+    const awaitForScorePromise = new Promise(resolve => awaitForScore = resolve)
+    const awaitForTimeRunsOutRace = new Promise(resolve => awaitForTimeRunsOut = resolve)
+    return Promise.race([awaitForScorePromise, awaitForTimeRunsOutRace]).then(out => out)
 }
 
 class Block {
-    constructor(trialClass, nTrials, interTrialInterval) {
+    constructor(trialClass, nTrials, interTrialInterval, isFinalBlock=false) {
         this.trialClass = trialClass,
         this.nTrials = nTrials
         this.interTrialInterval = interTrialInterval
+        this.isFinalBlock = isFinalBlock
     }
 
     async run() {
@@ -293,11 +370,48 @@ class Block {
         for (let i=0; i<this.nTrials; i++) {
             this.trialClass.init()
             this.trialClass.play()
-            await awaitForResolve()
+            await awaitForNextTrial()
             
             if (i == this.nTrials-1) {
-                this.trialClass.end()
+                const trialData = this.trialClass.end()
+                
+                const data = JSON.parse(localStorage.getItem("data"))
+                data["userData"].push(trialData)
+                localStorage.setItem("data", JSON.stringify(data))
+
+                if (this.isFinalBlock) sendDataToFirebase()
             }
+        }
+
+    }
+}
+
+let awaitForBlockStart
+
+const awaitForBlockStartPromise = async () => {
+    return new Promise(resolve => awaitForBlockStart = resolve)
+}
+
+class Task {
+    constructor(blocks, interBlocksInterval) {
+        this.blocks = blocks
+        this.interBlocksInterval = interBlocksInterval
+    }
+
+    wait() {
+        setTimeout(() => {
+            if (awaitForBlockStart) awaitForBlockStart()
+        }, this.interBlocksInterval)
+    }
+
+    async run() {
+
+        for (let i=0; i<this.blocks.length; i++) {
+
+            this.wait()
+            await awaitForBlockStartPromise()
+
+            this.blocks[i].run()
         }
 
     }
@@ -309,20 +423,14 @@ class Block {
 
 const rho = 500
 const plane = new ImagePairsPlane(rho)
-
-const trial = new Trial(plane, 1000, 2000)
-
 //plane.createStimuli()
 //plane.drawStimuliForDebugging(true)
 //plane.drawStimuli()
 
-/////////////////////////////////////////////////
-/////////////////////////////////////////////////
-/////////////////////////////////////////////////
-
-const block = new Block(trial, N_TRIALS, 5000)
-block.run()
-
-
+const trial = new Trial(plane, 1000, 2000)
+const block = new Block(trial, N_TRIALS, 5000, isFinalBlock=true)
+const blocks = [block]
+const task = new Task(blocks, 2000)
+task.run()
 
 
